@@ -156,13 +156,18 @@ const Transpilador = () => {
         const comparacao2 = whereString.split("and")[1].trim()
         const algebraRelacionalWhere = `σ ${comparacao1} ^ ${comparacao2} `
 
+        let regexTabela1 = new RegExp(`\\b${tabela1}\\b(?=\\s*\\|X\\|)|\\b${tabela1}\\b(?=\\s*\\))`, 'g');
+        let regexTabela2 = new RegExp(`\\b${tabela2}\\b(?=\\s*\\|X\\|)|\\b${tabela2}\\b(?=\\s*\\))`, 'g');
+
+
         console.log(juncao.replace(algebraRelacionalWhere, ""))
         const whereRemoved = juncao.replace(algebraRelacionalWhere, "")
-        const tabelaComp1 = getTabela(comparacao1)
-        const tabelaComp2 = getTabela(comparacao2)
-        console.log(whereRemoved.replace('Cliente', `(${comparacao1}(${tabela1}))`))
-        const firstTableChanged = whereRemoved.replace('Cliente', `(${comparacao1}(${tabela1}))`)
-        console.log(firstTableChanged.replace(/\bpedido\b/, ""))
+        console.log(whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`))
+        const firstTableChanged = whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`)
+        console.log(firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`))
+        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`)
+
+        return secondTableChanged
     };
 
     const handleReducaoCampos = (comandoSql, reducaoTuplas) => {
