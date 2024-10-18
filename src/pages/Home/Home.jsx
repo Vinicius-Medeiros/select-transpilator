@@ -4,7 +4,6 @@ import React from "react";
 import TabContainer from "../../components/TabContainer/TabContainer";
 
 const Home = () => {
-
     return (
         <React.Fragment>
             <AppBar position="static">

@@ -18,7 +18,6 @@ export const juntaArrays = (arr1, arr2) => {
     const mergedArray = [...arr1];
 
     arr2.forEach(item => {
-        // Adiciona o item apenas se ele não estiver presente no primeiro array
         if (!arr1.includes(item.trim())) {
             mergedArray.push(item.trim());
         }
@@ -49,9 +48,8 @@ export const parseToTreeStructure = expr => {
             }
             const completed = current;
             current = stack.pop();
-            //console.log('completed? ', completed)
-            //console.log()
-            current.children.push(completed);
+
+            current.children?.push(completed);
         } else {
             buffer += char;
         }
@@ -61,19 +59,16 @@ export const parseToTreeStructure = expr => {
         current.name = buffer.trim();
     }
 
-    const emptyChildren = current.children.find(node => node.name === '')
-    current.children = emptyChildren.children
-
     let order = 1;
-    const assignOrder = (node) => {
+    const assignOrder = node => {
         if (node.children && node.children.length > 0) {
             node.children.forEach(child => assignOrder(child));
         }
         node.order = order++;
-        node.name += ` (${node.order})`
-    }
+        node.name += ` (${node.order})`;
+    };
     assignOrder(current);
 
-    console.log(current)
+    //console.log(current);
     return current;
 };

@@ -15,21 +15,27 @@ const ArvoreProjecao = () => {
 
     const containerStyles = {
         width: "100%",
-        height: '100vh',
-        marginTop: '20px'
+        height: "100vh",
+        marginTop: "20px",
+        justifyContet: "center",
+        alignItems: "center",
     };
 
     return (
         <div style={containerStyles}>
             {treeData && (
-                <Tree 
-                    style={containerStyles} 
-                    data={treeData} 
+                <Tree
+                    style={containerStyles}
+                    data={treeData}
                     orientation="vertical"
+                    translate={{ x: 899.525, y: 91.8946 }}
+                    transitionDuration={500}
+                    centeringTransitionDuration={800}
+                    zoom={0.75}
                     separation={{
                         siblings: 7,
-                        nonSiblings: 7
-                    }} 
+                        nonSiblings: 7,
+                    }}
                 />
             )}
         </div>

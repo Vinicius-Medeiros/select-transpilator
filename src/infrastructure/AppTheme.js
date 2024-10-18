@@ -13,12 +13,12 @@ export const AppTheme = createTheme({
         MuiTab: {
             styleOverrides: {
                 root: {
-                    '&.Mui-selected': {
-                        color: 'white',
-                        backgroundColor: '#3f51b5'
-                    }
-                }
-            }
-        }
-    }
+                    "&.Mui-selected": {
+                        color: "white",
+                        backgroundColor: "#3f51b5",
+                    },
+                },
+            },
+        },
+    },
 });

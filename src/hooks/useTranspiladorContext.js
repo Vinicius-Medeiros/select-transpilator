@@ -1,10 +1,10 @@
-import { useContext } from "react"
-import { TranspiladorContext } from "../context/TranspiladorContext"
+import { useContext } from "react";
+import { TranspiladorContext } from "../context/TranspiladorContext";
 
 const useTranspiladorContext = () => {
-    const context = useContext(TranspiladorContext)
+    const context = useContext(TranspiladorContext);
 
-    return context
-}
+    return context;
+};
 
-export default useTranspiladorContext
+export default useTranspiladorContext;
