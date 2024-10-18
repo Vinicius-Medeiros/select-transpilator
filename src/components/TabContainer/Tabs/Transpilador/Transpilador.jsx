@@ -3,6 +3,7 @@ import { Parser } from "node-sql-parser";
 import React from "react";
 import { Tabelas } from "../../../../data/constants";
 import useTranspiladorContext from "../../../../hooks/useTranspiladorContext";
+import { juntaArrays, mapearCampos } from "../../../../utils/functions";
 
 const selectRegex = /^Select\s+(.*?)(?=\s+from\s+)/is
 const fromRegex = /\bfrom\s+(.*?)(?=\s+where\s+|\s*;?$)/is
@@ -19,12 +20,15 @@ const Transpilador = () => {
         setIsSqlCommandValid,
         sqlCommandParsed,
         setSqlCommandParsed,
+        stringJuncao,
+        setStringJuncao,
+        stringReducaoTuplas,
+        setStringReducaoTuplas,
+        stringReducaoCampos,
+        setStringReducaoCampos,
+        setStringAlgebraRelacional
     } = useTranspiladorContext()
     const parser = new Parser()
-
-    const [stringJuncao, setStringJuncao] = React.useState("")
-    const [stringReducaoTuplas, setStringReducaoTuplas] = React.useState("")
-    const [stringReducaoCampos, setStringReducaoCampos] = React.useState("")
 
     const formatErrorMessage = error => {
         if (!error.expected || !error.location)
@@ -108,11 +112,6 @@ const Transpilador = () => {
         }
     };
 
-    const getTabela = (string) => {
-        const regex = /\b(\w+)\b(?=\.\s*|$)/
-        return string.match(regex)[0]
-    }
-
     const handleHeuristicaJuncao = comandoSql => {
         const selectString = comandoSql.match(selectRegex)[1]
         const fromString = comandoSql.match(fromRegex)[1]
@@ -120,6 +119,7 @@ const Transpilador = () => {
         console.log("Clausula Select:", selectString)
         console.log("Clausula From:", fromString)
         console.log("Clausula Where:", whereString)
+        console.log('')
 
         const tabelas = fromString.split("on")[0].trim()
         const igualdade = fromString.split("on")[1].trim()
@@ -131,14 +131,15 @@ const Transpilador = () => {
         const comparacao1 = whereString.split("and")[0].trim()
         const comparacao2 = whereString.split("and")[1].trim()
         //console.log(`(σ ${comparacao1} ^ ${comparacao2}`)
-        const algebraRelacionalWhere = `(σ ${comparacao1} ^ ${comparacao2} `
+        const algebraRelacionalWhere = `((σ ${comparacao1} ^ ${comparacao2} `
 
         const select = selectString
         //console.log(`π ${select} `)
         const algebraRelacionalSelect = `π ${select} `
 
         const stringAlgebraRelacionalJuncao = algebraRelacionalSelect + algebraRelacionalWhere + algebreRelacionalFrom;
-        console.log(stringAlgebraRelacionalJuncao)
+        console.log('Heuristica Junção: ', '\n', stringAlgebraRelacionalJuncao)
+        console.log('')
         return stringAlgebraRelacionalJuncao
     };
 
@@ -160,28 +161,56 @@ const Transpilador = () => {
         let regexTabela2 = new RegExp(`\\b${tabela2}\\b(?=\\s*\\|X\\|)|\\b${tabela2}\\b(?=\\s*\\))`, 'g');
 
 
-        console.log(juncao.replace(algebraRelacionalWhere, ""))
-        const whereRemoved = juncao.replace(algebraRelacionalWhere, "")
-        console.log(whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`))
+        console.log('Heuristica Juncao sem clausula WHERE ', '\n', juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, '($1)'), '\n')
+        const whereRemoved = juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, '($1)')
+        //console.log(whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`))
         const firstTableChanged = whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`)
-        console.log(firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`))
-        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`)
+        //console.log(firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`))
+        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2})`)
 
+        console.log('Heuristica Redução Tuplas: ', '\n', secondTableChanged)
+        console.log('')
         return secondTableChanged
     };
 
-    const handleReducaoCampos = (comandoSql, reducaoTuplas) => {
-        
+    const handleReducaoCampos = (comandoSql, reducaoTuplas, juncao) => {
+        const selectString = comandoSql.match(selectRegex)[1]
+        const fromString = comandoSql.match(fromRegex)[1]
+        const whereString = comandoSql.match(whereRegex)[1]
+
+        const tabelas = fromString.split("on")[0].trim()
+        const tabela1 = tabelas.split("Join")[0].trim().toLowerCase()
+        const tabela2 = tabelas.split("Join")[1].trim().toLowerCase()
+
+        const comparacao1 = whereString.split("and")[0].trim()
+        const comparacao2 = whereString.split("and")[1].trim()
+        const algebraRelacionalWhere = `σ ${comparacao1} ^ ${comparacao2} `
+        const whereRemoved = juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, '($1)')
+
+        let regexTabela1 = new RegExp(`\\b${tabela1}\\b(?=\\s*\\|X\\|)|\\b${tabela1}\\b(?=\\s*\\))`, 'gi');
+        let regexTabela2 = new RegExp(`\\b${tabela2}\\b(?=\\s*\\|X\\|)|\\b${tabela2}\\b(?=\\s*\\))`, 'gi');
+
+        const camposSelect = selectString.split(',')
+        const camposFromJoin = fromString.split("on")[1].trim().split('=')
+        const todosCampos = mapearCampos(juntaArrays(camposSelect, camposFromJoin))
+
+        const firstTableChanged = whereRemoved.replace(regexTabela1, `(π ${todosCampos[tabela1]?.join(', ')}(${comparacao1}(${tabela1})))`)
+        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(π ${todosCampos[tabela2]?.join(', ')}(${comparacao2}(${tabela2}))))`)
+        console.log('Heuristica Redução Campos: ', '\n', secondTableChanged)
+        console.log('')
+
+        return secondTableChanged
     };
 
     const handleTransiplateSqlCommand = () => {
         const juncao = handleHeuristicaJuncao(sqlCommand)
         const reducaoTuplas = handleReducaoTuplas(sqlCommand, juncao)
-        const reducaoCampos = handleReducaoCampos(sqlCommand, reducaoTuplas)
+        const reducaoCampos = handleReducaoCampos(sqlCommand, reducaoTuplas, juncao)
         setStringJuncao(juncao)
         setStringReducaoTuplas(reducaoTuplas)
         setStringReducaoCampos(reducaoCampos)
 
+        setStringAlgebraRelacional(reducaoCampos)
         return setSqlCommandParsed(reducaoCampos)
     };
 

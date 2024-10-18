@@ -19,6 +19,12 @@ const TranspiladorContextProvider = props => {
     const [isSqlCommandaValid, setIsSqlCommandValid] = React.useState(false);
     const [sqlCommandParsed, setSqlCommandParsed] = React.useState('');
 
+    const [stringJuncao, setStringJuncao] = React.useState("")
+    const [stringReducaoTuplas, setStringReducaoTuplas] = React.useState("")
+    const [stringReducaoCampos, setStringReducaoCampos] = React.useState("")
+
+    const [stringAlgebraRelacional, setStringAlgebraRelacional] = React.useState('')
+
     const showAlert = (message, severity = "info") => {
         setMessage(message);
         setSeverity(severity);
@@ -38,7 +44,15 @@ const TranspiladorContextProvider = props => {
         isSqlCommandaValid,
         setIsSqlCommandValid,
         sqlCommandParsed,
-        setSqlCommandParsed
+        setSqlCommandParsed,
+        stringJuncao,
+        setStringJuncao,
+        stringReducaoTuplas,
+        setStringReducaoTuplas,
+        stringReducaoCampos,
+        setStringReducaoCampos,
+        stringAlgebraRelacional,
+        setStringAlgebraRelacional
     };
 
     const { children } = props;

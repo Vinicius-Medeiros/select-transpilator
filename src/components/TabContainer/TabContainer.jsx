@@ -1,6 +1,7 @@
 import { TabContext, TabList, TabPanel } from "@mui/lab";
 import { Tabs } from "@mui/material";
 import React from "react";
+import ArvoreProjecao from "./Tabs/ArvoreProjecao/ArvoreProjecao";
 import { Transpilador } from "./Tabs/Transpilador";
 import { tabList, tabListStyle, tabPanelStyle, tabsStyle } from "./constants";
 
@@ -13,7 +14,8 @@ const TabContainer = () => {
 	}
 
 	const tabs = [
-		{ tabContent: <Transpilador />, value: '1' }
+		{ tabContent: <Transpilador />, value: '1' },
+		{ tabContent: <ArvoreProjecao />, value: '2' }
 	]
 
     return (

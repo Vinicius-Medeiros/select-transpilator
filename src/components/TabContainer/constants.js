@@ -33,4 +33,5 @@ export const tabsStyle = {
 
 export const tabList = [
     { component: <Tab label='Transpilar comando SQL' key='tab - 1' value='1' /> },
+    { component: <Tab label='Arvoré de Projeção - Ordem de Execução' key='tab - 2' value='2' /> }
 ]
