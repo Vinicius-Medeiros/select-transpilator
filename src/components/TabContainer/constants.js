@@ -20,11 +20,12 @@ export const tabListStyle = {
 };
 
 export const tabPanelStyle = {
-    padding: 0,
     padding: 2,
     backgroundColor: "white",
-    border: "none",
     border: "1px solid #3f51b5",
+    borderRight: "2px solid #3f51b5",
+    borderLeft: "2px solid #3f51b5",
+    borderBottom: "2px solid #3f51b5",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
 };

@@ -235,21 +235,6 @@ const Transpilador = () => {
         return setSqlCommandParsed(reducaoCampos);
     };
 
-    const highlightSql = sql => {
-        const keywords = {
-            select: "green",
-            from: "blue",
-            where: "red",
-        };
-
-        const regex = new RegExp(`\\b(${Object.keys(keywords).join("|")})\\b`, "gi");
-        const styledSql = sql.replace(regex, match => {
-            return `<span style="color: ${keywords[match.toLowerCase()]}">${match}</span>`;
-        });
-
-        return { __html: styledSql };
-    };
-
     return (
         <Grid container spacing={2}>
             <Grid size={{ md: 12 }}>
