@@ -131,7 +131,7 @@ export const extrairExpressao = (input, tabela) => {
 
     if (match) {
         const tabelaIndex = match.index;
-        
+
         // Verifica se há um '(' imediatamente antes da tabela
         if (input[tabelaIndex - 1] === "(" && input[tabelaIndex + tabela.length] === ")") {
             // Encontrar o segundo '(' à esquerda da tabela

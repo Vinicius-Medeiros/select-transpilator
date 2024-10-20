@@ -15,8 +15,7 @@ const ArvoreProjecao = () => {
 
     const containerStyles = {
         width: "100%",
-        height: "100vh",
-        marginTop: "20px",
+        height: "75vh",
         justifyContet: "center",
         alignItems: "center",
     };

@@ -251,7 +251,7 @@ const Transpilador = () => {
     };
 
     return (
-        <Grid container spacing={2} marginTop={2}>
+        <Grid container spacing={2}>
             <Grid size={{ md: 12 }}>
                 <Typography sx={{ width: "100%", textAlign: "center" }}>
                     É necessário validar o comando SQL para poder fazer a transpilação!
