@@ -3,7 +3,7 @@ import { Parser } from "node-sql-parser";
 import React from "react";
 import { Tabelas } from "../../../../data/constants";
 import useTranspiladorContext from "../../../../hooks/useTranspiladorContext";
-import { juntaArrays, mapearCampos } from "../../../../utils/functions";
+import { extractTablesFromWhereClause, extrairExpressao, extrairJoins, getCamposFromJoin, juntaArrays, mapearCampos, removeUnmatchedParentheses } from "../../../../utils/functions";
 
 const selectRegex = /^Select\s+(.*?)(?=\s+from\s+)/is;
 const fromRegex = /\bfrom\s+(.*?)(?=\s+where\s+|\s*;?$)/is;
@@ -30,6 +30,8 @@ const Transpilador = () => {
     } = useTranspiladorContext();
     const parser = new Parser();
 
+    const [isValueChanged, setIsValueChanged] = React.useState(false);
+
     const formatErrorMessage = error => {
         if (!error.expected || !error.location) return "Erro desconhecido na consulta SQL.";
 
@@ -38,6 +40,7 @@ const Transpilador = () => {
     };
 
     const handleChangeSqlCommand = event => {
+        setIsValueChanged(true);
         const newValue = event.target.value;
         setSqlCommand(newValue);
 
@@ -93,6 +96,7 @@ const Transpilador = () => {
             }
 
             setIsSqlCommandValid(true);
+            setIsValueChanged(false);
             showAlert("Código foi validado com sucesso!", "success");
             setError(""); // Se tudo estiver correto
         } catch (e) {
@@ -111,21 +115,37 @@ const Transpilador = () => {
         console.log("Clausula Where:", whereString);
         console.log("");
 
-        const tabelas = fromString.split("on")[0].trim();
-        const igualdade = fromString.split("on")[1].trim();
-        const tabela1 = tabelas.split("Join")[0].trim();
-        const tabela2 = tabelas.split("Join")[1].trim();
-        //console.log(`(${tabela1} |X| ${igualdade} ${tabela2})`)
-        const algebreRelacionalFrom = `(${tabela1} |X| ${igualdade} ${tabela2}))`;
-
-        const comparacao1 = whereString.split("and")[0].trim();
-        const comparacao2 = whereString.split("and")[1].trim();
-        //console.log(`(σ ${comparacao1} ^ ${comparacao2}`)
-        const algebraRelacionalWhere = `(σ ${comparacao1} ^ ${comparacao2} `;
-
         const select = selectString;
-        //console.log(`π ${select} `)
         const algebraRelacionalSelect = `π ${select} `;
+
+        const whereStringAdapted = whereString.replace(/and/gi, "^");
+        const algebraRelacionalWhere = `(σ ${whereStringAdapted} `;
+
+        const arrayJoins = extrairJoins(fromString);
+        const parentesesAbrindo = "(".repeat(arrayJoins.length);
+        const parentesesFechando = ")".repeat(arrayJoins.length);
+        let algebreRelacionalFrom = "";
+
+        arrayJoins.forEach((joinString, index) => {
+            const tabelas = joinString.split("on")[0].trim();
+            const acao = joinString.split("on")[1].trim();
+            const tabela1 = tabelas.split("Join")[0].trim();
+            const tabela2 = tabelas.split("Join")[1].trim();
+            if (index === 0) {
+                algebreRelacionalFrom += `${parentesesAbrindo}${tabela1} |X| ${acao} ${tabela2})`;
+                if (index + 1 === arrayJoins.length) {
+                    algebreRelacionalFrom += parentesesFechando;
+                }
+            } else if (index < arrayJoins.length - 1) {
+                algebreRelacionalFrom += ` |X| ${acao} ${tabela2})`;
+            } else {
+                if (arrayJoins.length === 2) {
+                    algebreRelacionalFrom += ` |X| ${acao} ${tabela2}${parentesesFechando}`;
+                } else {
+                    algebreRelacionalFrom += ` |X| ${acao} ${tabela2}${")".repeat(arrayJoins.length - 2)}`;
+                }
+            }
+        });
 
         const stringAlgebraRelacionalJuncao = algebraRelacionalSelect + algebraRelacionalWhere + algebreRelacionalFrom;
         console.log("Heuristica Junção: ", "\n", stringAlgebraRelacionalJuncao);
@@ -134,73 +154,100 @@ const Transpilador = () => {
     };
 
     const handleReducaoTuplas = (comandoSql, juncao) => {
-        const selectString = comandoSql.match(selectRegex)[1];
-        const fromString = comandoSql.match(fromRegex)[1];
+        let stringAlgebraRelacionalReducaoTuplas = "";
+
         const whereString = comandoSql.match(whereRegex)[1];
 
-        const tabelas = fromString.split("on")[0].trim();
-        const igualdade = fromString.split("on")[1].trim();
-        const tabela1 = tabelas.split("Join")[0].trim();
-        const tabela2 = tabelas.split("Join")[1].trim();
+        const stringSemWhere = removeUnmatchedParentheses(juncao.replace(/\([^()]*\(/, "("));
+        const arrTabelasUsadasNoWhere = extractTablesFromWhereClause(whereString);
+        console.log("Tabelas usadas no WHERE: ", "\n", arrTabelasUsadasNoWhere);
 
-        const comparacao1 = whereString.split("and")[0].trim();
-        const comparacao2 = whereString.split("and")[1].trim();
-        const algebraRelacionalWhere = `σ ${comparacao1} ^ ${comparacao2} `;
+        stringAlgebraRelacionalReducaoTuplas = stringSemWhere;
+        arrTabelasUsadasNoWhere.forEach(arrInfo => {
+            const tabela = arrInfo[0];
+            const restricaoTabela = arrInfo[1];
+            const regex = new RegExp(`\\b${tabela}\\b(?=\\s*\\|X\\|)|\\b${tabela}\\b(?=\\s*\\))`, "gi");
+            let stringSubstituta = `(${restricaoTabela}(${tabela}))`;
 
-        let regexTabela1 = new RegExp(`\\b${tabela1}\\b(?=\\s*\\|X\\|)|\\b${tabela1}\\b(?=\\s*\\))`, "g");
-        let regexTabela2 = new RegExp(`\\b${tabela2}\\b(?=\\s*\\|X\\|)|\\b${tabela2}\\b(?=\\s*\\))`, "g");
+            stringAlgebraRelacionalReducaoTuplas = stringAlgebraRelacionalReducaoTuplas.replace(regex, stringSubstituta);
+        });
 
-        console.log("Heuristica Juncao sem clausula WHERE ", "\n", juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, "($1)"), "\n");
-        const whereRemoved = juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, "($1)");
-        //console.log(whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`))
-        const firstTableChanged = whereRemoved.replace(regexTabela1, `(${comparacao1}(${tabela1}))`);
-        //console.log(firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2}))`))
-        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(${comparacao2}(${tabela2})`);
+        console.log("Heuristica Juncao sem clausula WHERE: ", "\n", stringSemWhere);
 
-        console.log("Heuristica Redução Tuplas: ", "\n", secondTableChanged);
+        console.log("Heuristica Redução Tuplas: ", "\n", stringAlgebraRelacionalReducaoTuplas);
         console.log("");
-        return secondTableChanged;
+
+        return stringAlgebraRelacionalReducaoTuplas;
     };
 
-    const handleReducaoCampos = (comandoSql, reducaoTuplas, juncao) => {
+    const handleReducaoCampos = (comandoSql, reducaoTuplas) => {
+        let stringAlgebraRelacionalReducaoCampos = reducaoTuplas;
+
         const selectString = comandoSql.match(selectRegex)[1];
         const fromString = comandoSql.match(fromRegex)[1];
-        const whereString = comandoSql.match(whereRegex)[1];
-
-        const tabelas = fromString.split("on")[0].trim();
-        const tabela1 = tabelas.split("Join")[0].trim().toLowerCase();
-        const tabela2 = tabelas.split("Join")[1].trim().toLowerCase();
-
-        const comparacao1 = whereString.split("and")[0].trim();
-        const comparacao2 = whereString.split("and")[1].trim();
-        const algebraRelacionalWhere = `σ ${comparacao1} ^ ${comparacao2} `;
-        const whereRemoved = juncao.replace(algebraRelacionalWhere, "").replace(/\(\(([^()]+)\)\)/g, "($1)");
-
-        let regexTabela1 = new RegExp(`\\b${tabela1}\\b(?=\\s*\\|X\\|)|\\b${tabela1}\\b(?=\\s*\\))`, "gi");
-        let regexTabela2 = new RegExp(`\\b${tabela2}\\b(?=\\s*\\|X\\|)|\\b${tabela2}\\b(?=\\s*\\))`, "gi");
 
         const camposSelect = selectString.split(",");
-        const camposFromJoin = fromString.split("on")[1].trim().split("=");
-        const todosCampos = mapearCampos(juntaArrays(camposSelect, camposFromJoin));
+        console.log("Campos usados no SELECT: ", "\n", camposSelect);
 
-        const firstTableChanged = whereRemoved.replace(regexTabela1, `(π ${todosCampos[tabela1]?.join(", ")}(${comparacao1}(${tabela1})))`);
-        const secondTableChanged = firstTableChanged.replace(regexTabela2, `(π ${todosCampos[tabela2]?.join(", ")}(${comparacao2}(${tabela2})))`);
-        console.log("Heuristica Redução Campos: ", "\n", secondTableChanged);
+        const camposFromJoin = getCamposFromJoin(fromString);
+        console.log("Campos do(s) JOIN(s): ", "\n", camposFromJoin);
+
+        const todosCampos = mapearCampos(juntaArrays(camposSelect, camposFromJoin));
+        console.log("Todos os campos mapeados: ", "\n", todosCampos);
+
+        const quantidadeTabelasMapear = Object.keys(todosCampos).length;
+        const arrTabelasMapear = Object.keys(todosCampos);
+        const arrObjetosMapear = Object.values(todosCampos);
+        for (let i = 0; i < quantidadeTabelasMapear; i++) {
+            const tabela = arrTabelasMapear[i];
+            const expressaoSubstituir = extrairExpressao(reducaoTuplas, tabela);
+            console.log("Expressao a substituir: ", "\n", expressaoSubstituir);
+
+            const stringCamposColocar = `π ${arrObjetosMapear[i].join(", ")}`;
+            if (expressaoSubstituir === tabela) {
+                const stringSubstituta = `(${stringCamposColocar}(${expressaoSubstituir}))`;
+                const regex = new RegExp(`\\b${expressaoSubstituir}\\b(?=\\s*\\))|\\b${expressaoSubstituir}\\b(?=\\s*\\|X\\|)`, "gi");
+
+                stringAlgebraRelacionalReducaoCampos = stringAlgebraRelacionalReducaoCampos.replace(regex, stringSubstituta);
+            } else {
+                const stringSubstituta = `${stringCamposColocar}(${expressaoSubstituir})`;
+                const regex = new RegExp(expressaoSubstituir.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "gi");
+
+                stringAlgebraRelacionalReducaoCampos = stringAlgebraRelacionalReducaoCampos.replace(regex, stringSubstituta);
+            }
+        }
+
+        console.log("Heuristica Redução Campos: ", "\n", stringAlgebraRelacionalReducaoCampos);
         console.log("");
 
-        return secondTableChanged;
+        return stringAlgebraRelacionalReducaoCampos;
     };
 
     const handleTransiplateSqlCommand = () => {
         const juncao = handleHeuristicaJuncao(sqlCommand);
         const reducaoTuplas = handleReducaoTuplas(sqlCommand, juncao);
-        const reducaoCampos = handleReducaoCampos(sqlCommand, reducaoTuplas, juncao);
+        const reducaoCampos = handleReducaoCampos(sqlCommand, reducaoTuplas);
         setStringJuncao(juncao);
         setStringReducaoTuplas(reducaoTuplas);
         setStringReducaoCampos(reducaoCampos);
 
         setStringAlgebraRelacional(reducaoCampos);
         return setSqlCommandParsed(reducaoCampos);
+    };
+
+    const highlightSql = sql => {
+        const keywords = {
+            select: "green",
+            from: "blue",
+            where: "red",
+        };
+
+        const regex = new RegExp(`\\b(${Object.keys(keywords).join("|")})\\b`, "gi");
+        const styledSql = sql.replace(regex, match => {
+            return `<span style="color: ${keywords[match.toLowerCase()]}">${match}</span>`;
+        });
+
+        return { __html: styledSql };
     };
 
     return (
@@ -239,7 +286,7 @@ const Transpilador = () => {
                 <Button id="button-validar-sql" variant="contained" onClick={handleValidarConsultarSql}>
                     VALIDAR
                 </Button>
-                <Button id="button-transpilate-sql" variant="contained" disabled={!isSqlCommandaValid} onClick={handleTransiplateSqlCommand}>
+                <Button id="button-transpilate-sql" variant="contained" disabled={!isSqlCommandaValid || isValueChanged} onClick={handleTransiplateSqlCommand}>
                     TRANSPILAR
                 </Button>
             </Grid>
@@ -266,6 +313,8 @@ const Transpilador = () => {
                     label="Heurística Junção"
                     variant="outlined"
                     fullWidth
+                    multiline
+                    rows={5}
                     focused
                     slotProps={{
                         input: {
@@ -281,6 +330,8 @@ const Transpilador = () => {
                     label="Redução Tuplas"
                     variant="outlined"
                     fullWidth
+                    multiline
+                    rows={5}
                     focused
                     slotProps={{
                         input: {
@@ -296,6 +347,8 @@ const Transpilador = () => {
                     label="Redução Campos"
                     variant="outlined"
                     fullWidth
+                    multiline
+                    rows={5}
                     focused
                     slotProps={{
                         input: {
